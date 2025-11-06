@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary
+redis
+qdrant-client
+PyMuPDF
+python-dotenv
+requests
