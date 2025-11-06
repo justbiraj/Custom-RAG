@@ -4,8 +4,8 @@ import requests
 from typing import Dict
 
 from app.core.vector_client import vector_db
-from app.core.redis_client import get_memory, save_memory
-from app.services.embedder import create_ollama_embedding
+from app.core.redis_cient import get_memory, save_memory
+from app.services.embedding import create_ollama_embedding
 from app.core.database import Booking, SessionLocal
 from app.core.config import GEMINI_API_KEY
 
@@ -103,7 +103,7 @@ def parse_booking(query: str) -> Dict[str, str]:
 async def generate_response(query: str, session_id: str):
 	history = get_memory(session_id)
 
-	if "book interview" in query.lower() or "book a interview" in query.lower():
+	if (["book interview", "book a interview", "schedule interview", "schedule a interview", "interview", "book", "schedule"] in query.lower()):
 		booking_data = parse_booking(query)
 		try:
 			db = SessionLocal()
@@ -127,14 +127,14 @@ async def generate_response(query: str, session_id: str):
 
 	# Build prompt for Gemini
 	full_prompt = f"""
-You are a helpful assistant.
-Context:
-{context_text}
-Conversation so far:
-{history}
-User: {query}
-Answer helpfully based on context.
-"""
+        You are a helpful assistant.
+        Context:
+        {context_text}
+        Conversation so far:
+        {history}
+        User: {query}
+        Answer helpfully based on context.
+        """
 
 	gemini_url = (
 		f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
@@ -155,11 +155,5 @@ Answer helpfully based on context.
 
 	save_memory(session_id, query, answer)
 	return answer
-import re
-import requests
-# from app.core.vector_client import vector_db
-# from app.core.redis_cient import get_memory, save_memory
-# from app.services.embedding import create_ollama_embedding
-# from app.core.database import Booking, SessionLocal
-# from app.core.config import GEMINI_API_KEY
+
 
