@@ -1,11 +1,11 @@
 from qdrant_client import QdrantClient
-from qdrant_cient.models import VectorParams, Distance, PointStruct
+from qdrant_client.models import VectorParams, Distance, PointStruct
 from app.core.config import QDRANT_URL
 
 class VectorDB:
-    def __init__(self):
+    def __init__(self, session_id:str):
         self.client = QdrantClient(url=QDRANT_URL)
-        self.collection = "document"
+        self.collection = f"rag_document_{session_id}" 
         self._init_collection()
 
     def _init_collection(self):
@@ -13,7 +13,7 @@ class VectorDB:
         if self.collection not in existing:
             self.client.create_collection(
                 collection_name=self.collection,
-                vector_params=VectorParams(size=768, distance=Distance.COSINE)
+                vectors_config=VectorParams(size=768, distance=Distance.COSINE)
             )
     
     def upsert(self, chunks: list[str], embeddings: list[list[float]]):
@@ -31,4 +31,4 @@ class VectorDB:
         )
         return [r.payload["text"] for r in results]        
 
-vector_db = VectorDB()
+# vector_db = VectorDB()

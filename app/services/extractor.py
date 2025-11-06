@@ -1,11 +1,11 @@
-import PyMuPDF as fitz
+import pymupdf as fitz
 from fastapi import UploadFile
 
 def extract_text_from_pdf(file: UploadFile) -> str:
     """
     Extract text content from an uploaded PDF file.
     """
-    if file.filename.endwith('.pdf'):
+    if file.filename.endswith('.pdf'):
         pdf_document = fitz.open(stream=file.file.read(), filetype="pdf")
         return "\n".join([page.get_text() for page in pdf_document])
     elif file.filename.endswith('.txt'):

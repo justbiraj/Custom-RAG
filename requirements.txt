@@ -8,3 +8,4 @@ qdrant-client
 PyMuPDF
 python-dotenv
 requests
+python-multipart

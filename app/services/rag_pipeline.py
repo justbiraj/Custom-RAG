@@ -3,7 +3,7 @@ import re
 import requests
 from typing import Dict
 
-from app.core.vector_client import vector_db
+from app.core.vector_client import VectorDB
 from app.core.redis_cient import get_memory, save_memory
 from app.services.embedding import create_ollama_embedding
 from app.core.database import Booking, SessionLocal
@@ -101,24 +101,25 @@ def parse_booking(query: str) -> Dict[str, str]:
 		return _parse_booking_fallback(query)
 
 async def generate_response(query: str, session_id: str):
+	vectorDBInstance = VectorDB(session_id)
 	history = get_memory(session_id)
 
-	if (["book interview", "book a interview", "schedule interview", "schedule a interview", "interview", "book", "schedule"] in query.lower()):
-		booking_data = parse_booking(query)
-		try:
-			db = SessionLocal()
-			db.add(Booking(**booking_data))
-			db.commit()
-		except Exception:
-			# If DB write fails, still return confirmation to user but log/raise in real app
-			pass
-		return f"Interview booked for {booking_data['name']} on {booking_data['date']} at {booking_data['time']}"
+	# if any(keyword in query.lower() for keyword in ["book interview", "book a interview", "schedule interview", "schedule a interview", "interview", "book", "schedule"]):
+	# 	booking_data = parse_booking(query)
+	# 	try:
+	# 		db = SessionLocal()
+	# 		db.add(Booking(**booking_data))
+	# 		db.commit()
+	# 	except Exception:
+	# 		# If DB write fails, still return confirmation to user but log/raise in real app
+	# 		pass
+	# 	return f"Interview booked for {booking_data['name']} on {booking_data['date']} at {booking_data['time']}"
 
 	# Embed query locally with Ollama
 	embedding = create_ollama_embedding([query])[0]
 
 	# Retrieve context
-	context_chunks = vector_db.search(embedding)
+	context_chunks = vectorDBInstance.search(embedding)
 	# If vector_db returns objects, normalize to text; otherwise assume list[str]
 	if context_chunks and isinstance(context_chunks[0], dict):
 		context_text = "\n".join(c.get("text", "") for c in context_chunks)
@@ -136,9 +137,11 @@ async def generate_response(query: str, session_id: str):
         Answer helpfully based on context.
         """
 
+    
 	gemini_url = (
-		f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+		f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 	)
+	print(full_prompt)
 	resp = requests.post(
 		gemini_url,
 		json={"contents": [{"parts": [{"text": full_prompt}]}]},
@@ -146,14 +149,74 @@ async def generate_response(query: str, session_id: str):
 	)
 	resp.raise_for_status()
 	resp_json = resp.json()
-	answer = (
-		resp_json.get("candidates", [{}])[0]
-		.get("content", [{}])[0]
-		.get("parts", [{}])[0]
-		.get("text", "")
-	)
+	print(resp_json)
 
-	save_memory(session_id, query, answer)
-	return answer
+	# def _extract_text_from_model_response(obj) -> str:
+	# 	"""Robustly extract text from Gemini-like responses.
+
+	# 	The Gemini API has varied response shapes across versions. This helper
+	# 	attempts several common navigations and falls back safely to an empty
+	# 	string when nothing sensible is found.
+	# 	"""
+	# 	if not obj:
+	# 		return ""
+
+	# 	# Common shape: {'candidates': [ { 'content': [ { 'parts': [ { 'text': '...' } ] } ] } ] }
+	# 	try:
+	# 		candidates = obj.get("candidates")
+	# 		if isinstance(candidates, list) and candidates:
+	# 			first = candidates[0]
+	# 		elif isinstance(candidates, dict):
+	# 			# sometimes candidates is a dict keyed by id
+	# 			vals = list(candidates.values())
+	# 			first = vals[0] if vals else candidates
+	# 		else:
+	# 			first = None
+
+	# 		if isinstance(first, dict):
+	# 			content = first.get("content")
+	# 			if isinstance(content, list) and content:
+	# 				part0 = content[0]
+	# 			else:
+	# 				part0 = first
+
+	# 			if isinstance(part0, dict):
+	# 				parts = part0.get("parts")
+	# 				if isinstance(parts, list) and parts and isinstance(parts[0], dict):
+	# 					return parts[0].get("text", "") or ""
+	# 				# fallback to any text field on part0
+	# 				if isinstance(part0.get("text"), str):
+	# 					return part0.get("text", "")
+
+	# 	except Exception:
+	# 		# ignore and try other shapes
+	# 		pass
+
+	# 	# Other common shapes
+	# 	for key in ("output", "outputs", "response", "text"):
+	# 		val = obj.get(key)
+	# 		if isinstance(val, str) and val:
+	# 			return val
+	# 		if isinstance(val, list) and val:
+	# 			if isinstance(val[0], str):
+	# 				return val[0]
+	# 			if isinstance(val[0], dict):
+	# 				return val[0].get("text", "") or ""
+
+	# 	# Last resorts: try to stringify small dict fields
+	# 	for k, v in obj.items():
+	# 		if isinstance(v, str) and v:
+	# 			return v
+
+	# 	return ""
+
+	# answer = _extract_text_from_model_response(resp_json)
+	# if not answer:
+	# 	# fallback to raw text body if model returned plain text
+	# 	answer = resp.text or ""
+	ans = resp_json.get("candidates", [{}])[0].get("content", [{}]).get("parts", [{}])[0].get("text", "")
+	save_memory(session_id, query, ans)
+	# # return answer
+	return ans
 
 
